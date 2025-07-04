@@ -139,6 +139,7 @@ fun ProductListContent(modifier: Modifier = Modifier) {
     // Frequently bought together state
     var showFrequentlyBought by remember { mutableStateOf(false) }
     var frequentlyBoughtProducts by remember { mutableStateOf<List<FrequentlyBoughtProduct>>(emptyList()) }
+    var addedProductId by remember { mutableStateOf<Int?>(null) }
     
     // Update pagination state when data changes
     LaunchedEffect(allListItems.size) {
@@ -166,38 +167,45 @@ fun ProductListContent(modifier: Modifier = Modifier) {
         ) {
             val processedItems = processItemsForDisplay(paginatedItems)
             
-            items(processedItems) { item ->
-                when (item) {
+            processedItems.forEachIndexed { index, displayItem ->
+                when (displayItem) {
                     is DisplayItem.ProductRowItem -> {
-                        ProductRow(
-                            leftProduct = item.leftProduct,
-                            rightProduct = item.rightProduct,
-                            onAddToCart = { product ->
-                                // Simulate API call to get frequently bought together products
-                                frequentlyBoughtProducts = getFrequentlyBoughtTogether(product.id)
-                                showFrequentlyBought = true
+                        item(key = "product_row_$index") {
+                            ProductRow(
+                                leftProduct = displayItem.leftProduct,
+                                rightProduct = displayItem.rightProduct,
+                                onAddToCart = { product ->
+                                    // Simulate API call to get frequently bought together products
+                                    frequentlyBoughtProducts = getFrequentlyBoughtTogether(product.id)
+                                    addedProductId = product.id
+                                    showFrequentlyBought = true
+                                }
+                            )
+                        }
+                        
+                        // Add frequently bought together section right after the product that was added
+                        if (showFrequentlyBought && frequentlyBoughtProducts.isNotEmpty() && 
+                            (displayItem.leftProduct.id == addedProductId || displayItem.rightProduct?.id == addedProductId)) {
+                            item(key = "frequently_bought_$index") {
+                                FrequentlyBoughtTogetherSection(
+                                    products = frequentlyBoughtProducts,
+                                    onDismiss = { 
+                                        showFrequentlyBought = false
+                                        addedProductId = null
+                                    },
+                                    onAddToCart = { product ->
+                                        // Handle adding frequently bought product to cart
+                                    },
+                                    modifier = Modifier.padding(top = 16.dp)
+                                )
                             }
-                        )
+                        }
                     }
                     is DisplayItem.BannerDisplayItem -> {
-                        BannerCard(banner = item.banner)
+                        item(key = "banner_$index") {
+                            BannerCard(banner = displayItem.banner)
+                        }
                     }
-                }
-            }
-            
-            // Add frequently bought together section
-            if (showFrequentlyBought && frequentlyBoughtProducts.isNotEmpty()) {
-                item {
-                    FrequentlyBoughtTogetherSection(
-                        products = frequentlyBoughtProducts,
-                        onDismiss = { 
-                            showFrequentlyBought = false 
-                        },
-                        onAddToCart = { product ->
-                            // Handle adding frequently bought product to cart
-                        },
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
                 }
             }
             
@@ -645,50 +653,36 @@ fun FrequentlyBoughtProductCard(
 // Function to process list items for display (pairing products and inserting banners)
 private fun processItemsForDisplay(listItems: List<ListItem>): List<DisplayItem> {
     val displayItems = mutableListOf<DisplayItem>()
-    var productQueue = mutableListOf<Product>()
+    val products = mutableListOf<Product>()
+    val banners = mutableListOf<IndexedValue<Banner>>()
     
-    listItems.forEach { item ->
+    // First, separate products and banners with their intended positions
+    listItems.forEachIndexed { index, item ->
         when (item) {
-            is ListItem.ProductItem -> {
-                productQueue.add(item.product)
-                
-                // If we have 2 products, create a row
-                if (productQueue.size == 2) {
-                    displayItems.add(
-                        DisplayItem.ProductRowItem(
-                            leftProduct = productQueue[0],
-                            rightProduct = productQueue[1]
-                        )
-                    )
-                    productQueue.clear()
-                }
-            }
-            is ListItem.BannerItem -> {
-                // If we have a pending product, create a row with just one product
-                if (productQueue.isNotEmpty()) {
-                    displayItems.add(
-                        DisplayItem.ProductRowItem(
-                            leftProduct = productQueue[0],
-                            rightProduct = null
-                        )
-                    )
-                    productQueue.clear()
-                }
-                
-                // Add the banner
-                displayItems.add(DisplayItem.BannerDisplayItem(item.banner))
-            }
+            is ListItem.ProductItem -> products.add(item.product)
+            is ListItem.BannerItem -> banners.add(IndexedValue(index, item.banner))
         }
     }
     
-    // Handle any remaining product
-    if (productQueue.isNotEmpty()) {
-        displayItems.add(
-            DisplayItem.ProductRowItem(
-                leftProduct = productQueue[0],
-                rightProduct = null
-            )
-        )
+    // Create product rows (2 products per row)
+    val productRows = mutableListOf<DisplayItem.ProductRowItem>()
+    for (i in products.indices step 2) {
+        val leftProduct = products[i]
+        val rightProduct = if (i + 1 < products.size) products[i + 1] else null
+        productRows.add(DisplayItem.ProductRowItem(leftProduct, rightProduct))
+    }
+    
+    // Insert banners at appropriate positions
+    // Each banner should appear after every 4 product rows (8 products)
+    var bannerIndex = 0
+    for (i in productRows.indices) {
+        displayItems.add(productRows[i])
+        
+        // Insert banner after every 4 rows (8 products) if we have banners available
+        if ((i + 1) % 4 == 0 && bannerIndex < banners.size) {
+            displayItems.add(DisplayItem.BannerDisplayItem(banners[bannerIndex].value))
+            bannerIndex++
+        }
     }
     
     return displayItems
@@ -755,16 +749,14 @@ private fun createSampleData(): List<ListItem> {
     
     val items = mutableListOf<ListItem>()
     
-    // Add products with banners inserted strategically
-    products.forEachIndexed { index, product ->
+    // Add all products first
+    products.forEach { product ->
         items.add(ListItem.ProductItem(product))
-        
-        // Insert banners at strategic positions
-        when (index) {
-            7 -> items.add(ListItem.BannerItem(banners[0]))
-            17 -> items.add(ListItem.BannerItem(banners[1]))
-            27 -> items.add(ListItem.BannerItem(banners[2]))
-        }
+    }
+    
+    // Add banners (they will be positioned automatically by processItemsForDisplay)
+    banners.forEach { banner ->
+        items.add(ListItem.BannerItem(banner))
     }
     
     return items
