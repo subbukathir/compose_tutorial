@@ -5,25 +5,31 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.smarttoolfactory.tutorial1_1basics.model.PaginationState
 import com.smarttoolfactory.tutorial1_1basics.ui.ComposeTutorialsTheme
 import com.smarttoolfactory.tutorial1_1basics.ui.Green400
 import com.smarttoolfactory.tutorial1_1basics.ui.Orange400
+import com.smarttoolfactory.tutorial1_1basics.ui.components.JumpToTopButton
+import com.smarttoolfactory.tutorial1_1basics.ui.components.PaginationControls
+import kotlinx.coroutines.launch
 
 // Data class for Product
 data class Product(
@@ -107,30 +113,91 @@ fun ProductListWithBannerScreen() {
 
 @Composable
 fun ProductListContent(modifier: Modifier = Modifier) {
-    val listItems = createSampleData()
+    val allListItems = createSampleData()
     
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(vertical = 16.dp)
-    ) {
-        val processedItems = processItemsForDisplay(listItems)
+    // Pagination state management
+    var paginationState by remember { 
+        mutableStateOf(PaginationState(pageSize = 8, totalItems = allListItems.size))
+    }
+    
+    // Update pagination state when data changes
+    LaunchedEffect(allListItems.size) {
+        paginationState = paginationState.copy(totalItems = allListItems.size)
+    }
+    
+    // Get paginated items
+    val paginatedItems = remember(paginationState.currentPage, allListItems) {
+        val startIndex = paginationState.startIndex
+        val endIndex = paginationState.endIndex
+        allListItems.subList(startIndex, endIndex)
+    }
+    
+    Box(modifier = modifier.fillMaxSize()) {
+        val scrollState = rememberLazyListState()
+        val coroutineScope = rememberCoroutineScope()
         
-        items(processedItems) { item ->
-            when (item) {
-                is DisplayItem.ProductRowItem -> {
-                    ProductRow(
-                        leftProduct = item.leftProduct,
-                        rightProduct = item.rightProduct
-                    )
+        LazyColumn(
+            state = scrollState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            val processedItems = processItemsForDisplay(paginatedItems)
+            
+            items(processedItems) { item ->
+                when (item) {
+                    is DisplayItem.ProductRowItem -> {
+                        ProductRow(
+                            leftProduct = item.leftProduct,
+                            rightProduct = item.rightProduct
+                        )
+                    }
+                    is DisplayItem.BannerDisplayItem -> {
+                        BannerCard(banner = item.banner)
+                    }
                 }
-                is DisplayItem.BannerDisplayItem -> {
-                    BannerCard(banner = item.banner)
+            }
+            
+            // Add pagination controls at the bottom
+            if (paginationState.totalPages > 1) {
+                item {
+                    PaginationControls(
+                        paginationState = paginationState,
+                        onPageChange = { newState ->
+                            paginationState = newState
+                            // Scroll to top when page changes
+                            coroutineScope.launch {
+                                scrollState.animateScrollToItem(0)
+                            }
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
                 }
             }
         }
+        
+        // Jump to top button
+        val jumpThreshold = with(LocalDensity.current) { 56.dp.toPx() }
+        val jumpToTopButtonEnabled by remember {
+            derivedStateOf {
+                scrollState.firstVisibleItemIndex != 0 ||
+                        scrollState.firstVisibleItemScrollOffset > jumpThreshold
+            }
+        }
+        
+        JumpToTopButton(
+            enabled = jumpToTopButtonEnabled,
+            onClicked = {
+                coroutineScope.launch {
+                    scrollState.animateScrollToItem(0)
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        )
     }
 }
 
@@ -377,26 +444,72 @@ private fun createSampleData(): List<ListItem> {
         Product(3, "Coriander & Onion", "500 g", "₹66"),
         Product(4, "Exotics", "1 Kg", "₹66"),
         Product(5, "Orange Nagpur", "500 g", "₹66"),
-        Product(6, "Orange Nagpur", "1 Kg", "₹66")
+        Product(6, "Fresh Spinach", "1 Kg", "₹45"),
+        Product(7, "Tomatoes", "500 g", "₹30"),
+        Product(8, "Carrots", "1 Kg", "₹55"),
+        Product(9, "Potatoes", "2 Kg", "₹80"),
+        Product(10, "Onions", "1 Kg", "₹40"),
+        Product(11, "Green Beans", "500 g", "₹70"),
+        Product(12, "Bell Peppers", "250 g", "₹85"),
+        Product(13, "Broccoli", "500 g", "₹95"),
+        Product(14, "Cauliflower", "1 Pc", "₹50"),
+        Product(15, "Fresh Mint", "100 g", "₹20"),
+        Product(16, "Cucumber", "500 g", "₹35"),
+        Product(17, "Lettuce", "200 g", "₹65"),
+        Product(18, "Radish", "500 g", "₹25"),
+        Product(19, "Cabbage", "1 Kg", "₹35"),
+        Product(20, "Beetroot", "500 g", "₹45"),
+        Product(21, "Sweet Potato", "1 Kg", "₹75"),
+        Product(22, "Ginger", "200 g", "₹35"),
+        Product(23, "Garlic", "250 g", "₹40"),
+        Product(24, "Green Chili", "100 g", "₹15"),
+        Product(25, "Eggplant", "500 g", "₹60"),
+        Product(26, "Okra", "250 g", "₹55"),
+        Product(27, "Pumpkin", "1 Kg", "₹45"),
+        Product(28, "Bottle Gourd", "1 Kg", "₹40"),
+        Product(29, "Ridge Gourd", "500 g", "₹50"),
+        Product(30, "Bitter Gourd", "250 g", "₹70")
     )
     
-    val banner = Banner(
-        id = 1,
-        title = "Just Arrived!",
-        subtitle = "Badami",
-        buttonText = "Shop Now",
-        backgroundColor = Orange400
+    val banners = listOf(
+        Banner(
+            id = 1,
+            title = "Just Arrived!",
+            subtitle = "Fresh Badami",
+            buttonText = "Shop Now",
+            backgroundColor = Orange400
+        ),
+        Banner(
+            id = 2,
+            title = "Special Offer",
+            subtitle = "50% Off on Organic",
+            buttonText = "Get Deal",
+            backgroundColor = Green400
+        ),
+        Banner(
+            id = 3,
+            title = "New Season",
+            subtitle = "Winter Vegetables",
+            buttonText = "Explore",
+            backgroundColor = Color(0xFF9C27B0)
+        )
     )
     
-    return listOf(
-        ListItem.ProductItem(products[0]),
-        ListItem.ProductItem(products[1]),
-        ListItem.ProductItem(products[2]),
-        ListItem.ProductItem(products[3]),
-        ListItem.BannerItem(banner),
-        ListItem.ProductItem(products[4]),
-        ListItem.ProductItem(products[5])
-    )
+    val items = mutableListOf<ListItem>()
+    
+    // Add products with banners inserted strategically
+    products.forEachIndexed { index, product ->
+        items.add(ListItem.ProductItem(product))
+        
+        // Insert banners at strategic positions
+        when (index) {
+            7 -> items.add(ListItem.BannerItem(banners[0]))
+            17 -> items.add(ListItem.BannerItem(banners[1]))
+            27 -> items.add(ListItem.BannerItem(banners[2]))
+        }
+    }
+    
+    return items
 }
 
 @Preview(showBackground = true)
