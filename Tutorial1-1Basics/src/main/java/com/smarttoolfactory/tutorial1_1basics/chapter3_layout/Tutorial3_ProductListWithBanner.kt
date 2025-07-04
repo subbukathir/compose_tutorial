@@ -4,12 +4,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +22,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,7 +40,20 @@ data class Product(
     val name: String,
     val weight: String,
     val price: String,
+    val originalPrice: String? = null, // For showing crossed-out original price
+    val discountPercentage: Int? = null, // For discount badge (e.g., 4% OFF)
     val imageRes: Int = android.R.drawable.ic_menu_gallery // placeholder
+)
+
+// Data class for Frequently Bought Together Product
+data class FrequentlyBoughtProduct(
+    val id: Int,
+    val name: String,
+    val weight: String,
+    val price: String,
+    val originalPrice: String? = null,
+    val discountPercentage: Int? = null,
+    val imageRes: Int = android.R.drawable.ic_menu_gallery
 )
 
 // Data class for Banner
@@ -120,6 +136,10 @@ fun ProductListContent(modifier: Modifier = Modifier) {
         mutableStateOf(PaginationState(pageSize = 8, totalItems = allListItems.size))
     }
     
+    // Frequently bought together state
+    var showFrequentlyBought by remember { mutableStateOf(false) }
+    var frequentlyBoughtProducts by remember { mutableStateOf<List<FrequentlyBoughtProduct>>(emptyList()) }
+    
     // Update pagination state when data changes
     LaunchedEffect(allListItems.size) {
         paginationState = paginationState.copy(totalItems = allListItems.size)
@@ -151,12 +171,33 @@ fun ProductListContent(modifier: Modifier = Modifier) {
                     is DisplayItem.ProductRowItem -> {
                         ProductRow(
                             leftProduct = item.leftProduct,
-                            rightProduct = item.rightProduct
+                            rightProduct = item.rightProduct,
+                            onAddToCart = { product ->
+                                // Simulate API call to get frequently bought together products
+                                frequentlyBoughtProducts = getFrequentlyBoughtTogether(product.id)
+                                showFrequentlyBought = true
+                            }
                         )
                     }
                     is DisplayItem.BannerDisplayItem -> {
                         BannerCard(banner = item.banner)
                     }
+                }
+            }
+            
+            // Add frequently bought together section
+            if (showFrequentlyBought && frequentlyBoughtProducts.isNotEmpty()) {
+                item {
+                    FrequentlyBoughtTogetherSection(
+                        products = frequentlyBoughtProducts,
+                        onDismiss = { 
+                            showFrequentlyBought = false 
+                        },
+                        onAddToCart = { product ->
+                            // Handle adding frequently bought product to cart
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
                 }
             }
             
@@ -204,7 +245,8 @@ fun ProductListContent(modifier: Modifier = Modifier) {
 @Composable
 fun ProductRow(
     leftProduct: Product,
-    rightProduct: Product?
+    rightProduct: Product?,
+    onAddToCart: (Product) -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -212,12 +254,14 @@ fun ProductRow(
     ) {
         ProductCard(
             product = leftProduct,
+            onAddToCart = onAddToCart,
             modifier = Modifier.weight(1f)
         )
         
         if (rightProduct != null) {
             ProductCard(
                 product = rightProduct,
+                onAddToCart = onAddToCart,
                 modifier = Modifier.weight(1f)
             )
         } else {
@@ -229,6 +273,7 @@ fun ProductRow(
 @Composable
 fun ProductCard(
     product: Product,
+    onAddToCart: (Product) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -241,7 +286,7 @@ fun ProductCard(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Product Image
+            // Product Image with discount badge
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -255,6 +300,28 @@ fun ProductCard(
                     modifier = Modifier.size(60.dp),
                     contentScale = ContentScale.Fit
                 )
+                
+                // Discount badge
+                product.discountPercentage?.let { discount ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 4.dp, y = (-4).dp)
+                            .background(
+                                color = Color(0xFFE91E63),
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "${discount}%\nOFF",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            lineHeight = 10.sp
+                        )
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -282,15 +349,26 @@ fun ProductCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = product.price,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
+                // Price with crossed out original price if discount exists
+                Column {
+                    Text(
+                        text = product.price,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    product.originalPrice?.let { originalPrice ->
+                        Text(
+                            text = originalPrice,
+                            fontSize = 10.sp,
+                            color = Color.Gray,
+                            textDecoration = TextDecoration.LineThrough
+                        )
+                    }
+                }
                 
                 Button(
-                    onClick = { },
+                    onClick = { onAddToCart(product) },
                     colors = ButtonDefaults.buttonColors(
                         backgroundColor = Green400
                     ),
@@ -379,6 +457,186 @@ fun BannerCard(
                         contentScale = ContentScale.Fit
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun FrequentlyBoughtTogetherSection(
+    products: List<FrequentlyBoughtProduct>,
+    onDismiss: () -> Unit,
+    onAddToCart: (FrequentlyBoughtProduct) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = 4.dp,
+        backgroundColor = Color.White
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Header with title and close button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Frequently bought together",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Horizontal scrolling list of products
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                items(products) { product ->
+                    FrequentlyBoughtProductCard(
+                        product = product,
+                        onAddToCart = { onAddToCart(product) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FrequentlyBoughtProductCard(
+    product: FrequentlyBoughtProduct,
+    onAddToCart: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.width(120.dp),
+        shape = RoundedCornerShape(8.dp),
+        elevation = 2.dp,
+        backgroundColor = Color.White
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Product Image with discount badge
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFF5F5F5)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = product.imageRes),
+                    contentDescription = product.name,
+                    modifier = Modifier.size(45.dp),
+                    contentScale = ContentScale.Fit
+                )
+                
+                // Discount badge
+                product.discountPercentage?.let { discount ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 3.dp, y = (-3).dp)
+                            .background(
+                                color = Color(0xFFE91E63),
+                                shape = RoundedCornerShape(3.dp)
+                            )
+                            .padding(horizontal = 3.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "${discount}%\nOFF",
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            lineHeight = 8.sp
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            // Product Name
+            Text(
+                text = product.name,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black,
+                maxLines = 2,
+                lineHeight = 12.sp
+            )
+            
+            // Product Weight
+            Text(
+                text = product.weight,
+                fontSize = 8.sp,
+                color = Color.Gray
+            )
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            // Price
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = product.price,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                product.originalPrice?.let { originalPrice ->
+                    Text(
+                        text = originalPrice,
+                        fontSize = 9.sp,
+                        color = Color.Gray,
+                        textDecoration = TextDecoration.LineThrough
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            // Add Button
+            Button(
+                onClick = onAddToCart,
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Green400
+                ),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "Add",
+                    fontSize = 9.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
@@ -512,6 +770,43 @@ private fun createSampleData(): List<ListItem> {
     return items
 }
 
+// Function to simulate API call for frequently bought together products
+private fun getFrequentlyBoughtTogether(productId: Int): List<FrequentlyBoughtProduct> {
+    // Simulate different frequently bought products based on the added product
+    return when (productId % 5) {
+        0 -> listOf(
+            FrequentlyBoughtProduct(101, "Brinjal", "500 g", "₹66"),
+            FrequentlyBoughtProduct(102, "Capsicum Green", "500 g", "₹66"),
+            FrequentlyBoughtProduct(103, "Tomato", "500 g", "₹66", "₹69", 4),
+            FrequentlyBoughtProduct(104, "Onion Red", "1 Kg", "₹45")
+        )
+        1 -> listOf(
+            FrequentlyBoughtProduct(105, "Kellogg's Original Special Breakfast Cereals Box", "750 g", "₹315"),
+            FrequentlyBoughtProduct(106, "Amul Garlic & Herbs Buttery Spread Carton", "100 g", "₹80"),
+            FrequentlyBoughtProduct(107, "Fresh Milk", "1 L", "₹60"),
+            FrequentlyBoughtProduct(108, "Organic Honey", "250 g", "₹180")
+        )
+        2 -> listOf(
+            FrequentlyBoughtProduct(109, "Basmati Rice", "1 Kg", "₹120"),
+            FrequentlyBoughtProduct(110, "Cooking Oil", "1 L", "₹150"),
+            FrequentlyBoughtProduct(111, "Turmeric Powder", "100 g", "₹45"),
+            FrequentlyBoughtProduct(112, "Red Chili", "200 g", "₹85", "₹95", 10)
+        )
+        3 -> listOf(
+            FrequentlyBoughtProduct(113, "Greek Yogurt", "400 g", "₹95"),
+            FrequentlyBoughtProduct(114, "Whole Wheat Bread", "400 g", "₹35"),
+            FrequentlyBoughtProduct(115, "Organic Eggs", "12 Pcs", "₹84", "₹90", 7),
+            FrequentlyBoughtProduct(116, "Fresh Spinach", "250 g", "₹25")
+        )
+        else -> listOf(
+            FrequentlyBoughtProduct(117, "Coconut Oil", "500 ml", "₹180"),
+            FrequentlyBoughtProduct(118, "Almonds", "200 g", "₹220"),
+            FrequentlyBoughtProduct(119, "Green Tea", "100 g", "₹125", "₹140", 12),
+            FrequentlyBoughtProduct(120, "Dark Chocolate", "100 g", "₹150")
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun ProductListWithBannerPreview() {
@@ -540,6 +835,23 @@ fun BannerCardPreview() {
                 buttonText = "Shop Now",
                 backgroundColor = Orange400
             )
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun FrequentlyBoughtTogetherPreview() {
+    ComposeTutorialsTheme {
+        FrequentlyBoughtTogetherSection(
+            products = listOf(
+                FrequentlyBoughtProduct(101, "Brinjal", "500 g", "₹66"),
+                FrequentlyBoughtProduct(102, "Capsicum Green", "500 g", "₹66"),
+                FrequentlyBoughtProduct(103, "Tomato", "500 g", "₹66", "₹69", 4),
+                FrequentlyBoughtProduct(104, "Onion Red", "1 Kg", "₹45")
+            ),
+            onDismiss = { },
+            onAddToCart = { }
         )
     }
 }
