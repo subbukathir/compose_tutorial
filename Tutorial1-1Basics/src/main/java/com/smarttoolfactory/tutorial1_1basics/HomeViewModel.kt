@@ -13,6 +13,9 @@ class HomeViewModel : ViewModel() {
 
     val tutorialList = mutableListOf<List<TutorialSectionModel>>()
     
+    // Store current search results for pagination
+    private var currentSearchResults = listOf<TutorialSectionModel>()
+    
     // Pagination states for each tab
     var componentsPaginationState by mutableStateOf(PaginationState(pageSize = 10))
         private set
@@ -23,6 +26,10 @@ class HomeViewModel : ViewModel() {
     var gesturePaginationState by mutableStateOf(PaginationState(pageSize = 10))
         private set
     var graphicsPaginationState by mutableStateOf(PaginationState(pageSize = 10))
+        private set
+    
+    // Pagination state for search results
+    var searchPaginationState by mutableStateOf(PaginationState(pageSize = 10))
         private set
 
     fun updatePaginationStates() {
@@ -104,9 +111,31 @@ class HomeViewModel : ViewModel() {
             }
         }
 
+        // Store search results and update pagination state
+        currentSearchResults = filteredList.toList()
+        searchPaginationState = searchPaginationState.copy(
+            currentPage = 0,
+            totalItems = currentSearchResults.size
+        )
+
 //        println("🤖 ViewModel Query: $query, filteredList: ${filteredList.size}")
 
-        return filteredList.toList()
+        return currentSearchResults
+    }
+    
+    fun getPaginatedSearchResults(): List<TutorialSectionModel> {
+        return if (searchPaginationState.totalItems > 0) {
+            currentSearchResults.subList(
+                searchPaginationState.startIndex,
+                searchPaginationState.endIndex
+            )
+        } else {
+            emptyList()
+        }
+    }
+    
+    fun updateSearchPage(newPaginationState: PaginationState) {
+        searchPaginationState = newPaginationState
     }
 }
 

@@ -165,7 +165,13 @@ fun HomeScreen(
             }
 
             SearchDisplay.Results -> {
-                TutorialListContent(modifier, state.searchResults, navigateToTutorial)
+                PaginatedTutorialListContent(
+                    modifier = modifier,
+                    tutorialList = viewModel.getPaginatedSearchResults(),
+                    paginationState = viewModel.searchPaginationState,
+                    onPageChange = { newState -> viewModel.updateSearchPage(newState) },
+                    navigateToTutorial = navigateToTutorial
+                )
             }
 
             SearchDisplay.SearchInProgress -> {
