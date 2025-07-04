@@ -36,6 +36,7 @@ import androidx.compose.material.Tab
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,7 @@ import com.smarttoolfactory.tutorial1_1basics.model.SuggestionModel
 import com.smarttoolfactory.tutorial1_1basics.model.TutorialSectionModel
 import com.smarttoolfactory.tutorial1_1basics.ui.components.CancelableChip
 import com.smarttoolfactory.tutorial1_1basics.ui.components.JumpToTopButton
+import com.smarttoolfactory.tutorial1_1basics.ui.components.PaginatedTutorialListContent
 import com.smarttoolfactory.tutorial1_1basics.ui.components.StaggeredGrid
 import com.smarttoolfactory.tutorial1_1basics.ui.components.TutorialSectionCard
 import kotlinx.coroutines.launch
@@ -138,7 +140,7 @@ fun HomeScreen(
         when (state.searchDisplay) {
             // This is initial state, first time screen is opened or no query is done
             SearchDisplay.InitialResults -> {
-                HomeContent(modifier, state.initialResults, navigateToTutorial)
+                HomeContent(modifier, state.initialResults, navigateToTutorial, viewModel)
             }
 
             SearchDisplay.NoResults -> {
@@ -207,7 +209,8 @@ private fun SuggestionGridLayout(
 private fun HomeContent(
     modifier: Modifier,
     tutorialList: List<List<TutorialSectionModel>>,
-    navigateToTutorial: (String) -> Unit
+    navigateToTutorial: (String) -> Unit,
+    viewModel: HomeViewModel
 ) {
 
     val pagerState: PagerState = rememberPagerState(
@@ -218,6 +221,13 @@ private fun HomeContent(
         tabList.size
     }
     val coroutineScope = rememberCoroutineScope()
+
+    // Initialize pagination states when tutorial list is available
+    LaunchedEffect(tutorialList) {
+        if (tutorialList.isNotEmpty()) {
+            viewModel.updatePaginationStates()
+        }
+    }
 
     ScrollableTabRow(
         backgroundColor = MaterialTheme.colors.surface,
@@ -250,11 +260,41 @@ private fun HomeContent(
         state = pagerState
     ) { page: Int ->
         when (page) {
-            0 -> TutorialListContent(modifier, tutorialList[0], navigateToTutorial)
-            1 -> TutorialListContent(modifier, tutorialList[1], navigateToTutorial)
-            2 -> TutorialListContent(modifier, tutorialList[2], navigateToTutorial)
-            3 -> TutorialListContent(modifier, tutorialList[3], navigateToTutorial)
-            4 -> TutorialListContent(modifier, tutorialList[4], navigateToTutorial)
+            0 -> PaginatedTutorialListContent(
+                modifier = modifier,
+                tutorialList = viewModel.getPaginatedTutorials(0),
+                paginationState = viewModel.getPaginationStateForTab(0),
+                onPageChange = { newState -> viewModel.updatePageForTab(0, newState) },
+                navigateToTutorial = navigateToTutorial
+            )
+            1 -> PaginatedTutorialListContent(
+                modifier = modifier,
+                tutorialList = viewModel.getPaginatedTutorials(1),
+                paginationState = viewModel.getPaginationStateForTab(1),
+                onPageChange = { newState -> viewModel.updatePageForTab(1, newState) },
+                navigateToTutorial = navigateToTutorial
+            )
+            2 -> PaginatedTutorialListContent(
+                modifier = modifier,
+                tutorialList = viewModel.getPaginatedTutorials(2),
+                paginationState = viewModel.getPaginationStateForTab(2),
+                onPageChange = { newState -> viewModel.updatePageForTab(2, newState) },
+                navigateToTutorial = navigateToTutorial
+            )
+            3 -> PaginatedTutorialListContent(
+                modifier = modifier,
+                tutorialList = viewModel.getPaginatedTutorials(3),
+                paginationState = viewModel.getPaginationStateForTab(3),
+                onPageChange = { newState -> viewModel.updatePageForTab(3, newState) },
+                navigateToTutorial = navigateToTutorial
+            )
+            4 -> PaginatedTutorialListContent(
+                modifier = modifier,
+                tutorialList = viewModel.getPaginatedTutorials(4),
+                paginationState = viewModel.getPaginationStateForTab(4),
+                onPageChange = { newState -> viewModel.updatePageForTab(4, newState) },
+                navigateToTutorial = navigateToTutorial
+            )
             else -> ComingSoonScreen()
         }
     }

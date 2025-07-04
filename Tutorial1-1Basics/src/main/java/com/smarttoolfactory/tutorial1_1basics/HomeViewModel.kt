@@ -1,15 +1,84 @@
 package com.smarttoolfactory.tutorial1_1basics
 
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.smarttoolfactory.tutorial1_1basics.model.PaginationState
 import com.smarttoolfactory.tutorial1_1basics.model.SuggestionModel
 import com.smarttoolfactory.tutorial1_1basics.model.TutorialSectionModel
 
 class HomeViewModel : ViewModel() {
 
-
     val tutorialList = mutableListOf<List<TutorialSectionModel>>()
+    
+    // Pagination states for each tab
+    var componentsPaginationState by mutableStateOf(PaginationState(pageSize = 10))
+        private set
+    var layoutPaginationState by mutableStateOf(PaginationState(pageSize = 10))
+        private set
+    var statePaginationState by mutableStateOf(PaginationState(pageSize = 10))
+        private set
+    var gesturePaginationState by mutableStateOf(PaginationState(pageSize = 10))
+        private set
+    var graphicsPaginationState by mutableStateOf(PaginationState(pageSize = 10))
+        private set
 
+    fun updatePaginationStates() {
+        if (tutorialList.isNotEmpty()) {
+            componentsPaginationState = componentsPaginationState.updateTotalItems(
+                tutorialList.getOrNull(0)?.size ?: 0
+            )
+            layoutPaginationState = layoutPaginationState.updateTotalItems(
+                tutorialList.getOrNull(1)?.size ?: 0
+            )
+            statePaginationState = statePaginationState.updateTotalItems(
+                tutorialList.getOrNull(2)?.size ?: 0
+            )
+            gesturePaginationState = gesturePaginationState.updateTotalItems(
+                tutorialList.getOrNull(3)?.size ?: 0
+            )
+            graphicsPaginationState = graphicsPaginationState.updateTotalItems(
+                tutorialList.getOrNull(4)?.size ?: 0
+            )
+        }
+    }
+
+    fun updatePageForTab(tabIndex: Int, newPaginationState: PaginationState) {
+        when (tabIndex) {
+            0 -> componentsPaginationState = newPaginationState
+            1 -> layoutPaginationState = newPaginationState
+            2 -> statePaginationState = newPaginationState
+            3 -> gesturePaginationState = newPaginationState
+            4 -> graphicsPaginationState = newPaginationState
+        }
+    }
+
+    fun getPaginationStateForTab(tabIndex: Int): PaginationState {
+        return when (tabIndex) {
+            0 -> componentsPaginationState
+            1 -> layoutPaginationState
+            2 -> statePaginationState
+            3 -> gesturePaginationState
+            4 -> graphicsPaginationState
+            else -> PaginationState()
+        }
+    }
+
+    fun getPaginatedTutorials(tabIndex: Int): List<TutorialSectionModel> {
+        val fullList = tutorialList.getOrNull(tabIndex) ?: return emptyList()
+        val paginationState = getPaginationStateForTab(tabIndex)
+        
+        return if (paginationState.totalItems > 0) {
+            fullList.subList(
+                paginationState.startIndex,
+                paginationState.endIndex
+            )
+        } else {
+            emptyList()
+        }
+    }
 
     fun getTutorials(query: String): List<TutorialSectionModel> {
 
