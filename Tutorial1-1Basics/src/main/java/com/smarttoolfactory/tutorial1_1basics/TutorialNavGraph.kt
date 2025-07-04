@@ -45,6 +45,9 @@ fun TutorialNavGraph(
         mainViewModel.tutorialList.add(stateTutorialList)
         mainViewModel.tutorialList.add(gestureTutorialList)
         mainViewModel.tutorialList.add(graphicsTutorialList)
+        
+        // Initialize pagination states
+        mainViewModel.updatePaginationStates()
     }
 
     // Create Navigation for each Composable Page
